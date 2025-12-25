@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Command Prompt Interface</title>
+<style>
+    body {
+        background-color: black;
+        color: white;
+        font-family: "Courier New", monospace;
+        margin: 0;
+        padding: 20px;
+        font-size: 18px;
+    }
+    #terminal {
+        width: 100%;
+        max-width: 800px;
+        margin: auto;
+        white-space: pre-wrap;
+        overflow-y: auto;
+    }
+    #user-input {
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #00ff00;
+        font-family: inherit;
+        font-size: inherit;
+        width: 300px;
+    }
+    .dots::after {
+        content: '';
+        animation: dots 1s steps(3, end) infinite;
+    }
+    @keyframes dots {
+        0% { content: ''; }
+        33% { content: '.'; }
+        66% { content: '..'; }
+        100% { content: '...'; }
+    }
+    a {
+        color: #00ff00;
+        text-decoration: underline;
+    }
+</style>
+</head>
+<body>
+
+<div id="terminal"></div>
+
+<script>
+const terminal = document.getElementById("terminal");
+
+/* ---------- DATA ---------- */
+const teamsData = {
+    "manchester united": {
+        goals_scored: [2, 1, 4, 4, 1],
+        goals_conceded: [1, 1, 1, 4, 2]
+    },
+    "newcastle united": {
+        goals_scored: [2, 2, 0, 2, 2],
+        goals_conceded: [2, 2, 1, 1, 2]
+    },
+    "nottingham forest": {
+        goals_scored: [1, 0, 2, 3, 0],
+        goals_conceded: [0, 3, 1, 0, 1]
+    },
+    "manchester city": {
+        goals_scored: [3, 2, 3, 2, 3],
+        goals_conceded: [0, 1, 0, 0, 0]
+    },
+	   "arsenal": {
+        goals_scored: [1, 3, 2, 1, 1],
+        goals_conceded: [2, 0, 1, 0, 1]
+    },
+     "brighton": {
+        goals_scored: [2, 3, 1, 0, 0],
+        goals_conceded: [0, 4, 1, 2, 0]
+    },
+    "brentford": {
+        goals_scored: [0, 0, 1, 0, 2],
+        goals_conceded: [2, 2, 1, 2, 0]
+    },
+    "bournemouth": {
+        goals_scored: [2, 0, 0, 4, 1],
+        goals_conceded: [3, 1, 0, 4, 1]
+	},
+	"burnley": {
+        goals_scored: [1, 0, 1, 2, 1],
+        goals_conceded: [3, 1, 2, 3, 1]
+    },
+    "everton": {
+        goals_scored: [1, 1, 3, 0, 0],
+        goals_conceded: [4, 0, 0, 2, 1]
+	},
+	"liverpool": {
+        goals_scored: [1, 3, 1, 2, 2],
+        goals_conceded: [1, 3, 0, 0, 1]
+    },
+    "wolves": {
+        goals_scored: [0, 0, 1, 1, 0],
+        goals_conceded: [1, 1, 4, 2, 2]
+	},
+	"westham": {
+        goals_scored: [0, 1, 1, 2, 0],
+        goals_conceded: [2, 1, 1, 3, 3]
+    },
+    "fulham": {
+        goals_scored: [4, 1, 3, 1, 1],
+        goals_conceded: [5, 2, 2, 2, 0]
+	},
+	"chelsea": {
+        goals_scored: [0, 1, 2, 3, 2],
+        goals_conceded: [0, 2, 0, 1, 2]
+    },
+    "aston villa": {
+        goals_scored: [4, 2, 2, 3, 2],
+        goals_conceded: [3, 1, 1, 2, 1]
+	}
+};
+
+/* ---------- UTILITIES ---------- */
+function typeText(text, speed = 40) {
+    return new Promise(resolve => {
+        let i = 0;
+        const interval = setInterval(() => {
+            terminal.innerHTML += text[i];
+            i++;
+            if (i >= text.length) {
+                clearInterval(interval);
+                resolve();
+            }
+        }, speed);
+    });
+}
+
+function getUserInput(promptText = "> ") {
+    return new Promise(resolve => {
+        const inputLine = document.createElement("div");
+        inputLine.innerHTML = promptText;
+        const input = document.createElement("input");
+        input.type = "text";
+        input.id = "user-input";
+        input.autofocus = true;
+        inputLine.appendChild(input);
+        terminal.appendChild(inputLine);
+        input.focus();
+
+        input.addEventListener("keydown", e => {
+            if (e.key === "Enter") {
+                const val = input.value.trim().toLowerCase();
+                input.disabled = true;
+                inputLine.innerHTML = `${promptText}${val}`;
+                resolve(val);
+            }
+        });
+    });
+}
+
+function showRunningAnimation() {
+    const run = document.createElement("div");
+    run.id = "running-line";
+    run.classList.add("dots");
+    run.textContent = "Running";
+    terminal.appendChild(run);
+}
+
+function stopRunningAnimation() {
+    const run = document.getElementById("running-line");
+    if (run) run.remove();
+}
+
+/* ---------- MATH ---------- */
+function factorial(n) {
+    return n <= 1 ? 1 : n * factorial(n - 1);
+}
+function poisson(k, lambda) {
+    return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
+}
+
+/* ---------- OUTPUT ---------- */
+async function displayPoissonResults(label, dataArray) {
+    const avg = dataArray.reduce((a,b)=>a+b,0)/dataArray.length;
+    await typeText(`\nAverage ${label}: ${avg.toFixed(2)}\n`);
+    await typeText(`Poisson distribution for ${label} (0–5 goals):\n`);
+
+    const results = [];
+    for (let k=0;k<=5;k++){
+        const p = poisson(k, avg);
+        results.push({k,p});
+    }
+    const maxP = Math.max(...results.map(r=>r.p));
+
+    for (const r of results){
+        const percent = (r.p*100).toFixed(2);
+        const arrow = r.p === maxP ? "  <-- most likely" : "";
+        await typeText(` P(${r.k}) = ${r.p.toFixed(4)} (${percent}%)${arrow}\n`);
+    }
+    await typeText("\n");
+}
+
+/* ---------- MENU LOGIC ---------- */
+async function showMenu() {
+    await typeText("\nETQ TOKEN\n\n");
+	await typeText("\PLEASE NOTE: with this being a demo launch ony premier league teams playing on the 26th and 27th of December 2025 will be available\n\n");
+    await typeText("\nHello, please select an option (1,2 or 3):\n\n");
+    await typeText("1. View Data\n");
+    await typeText("2. Team\n");
+    await typeText("3. About Us\n\n");
+
+    const choice = await getUserInput("> ");
+    terminal.innerHTML += "\n";
+
+    if (choice === "1") {
+        await typeText("Opening data page...\n\n");
+        const link = document.createElement("a");
+        link.href = "https://pump.fun/";
+        link.target = "_blank";
+        link.textContent = "Click here to view data";
+        terminal.appendChild(link);
+    }
+    else if (choice === "2") {
+        await typeText("Please enter a team name (please type the full name):\n\n");
+        const teamName = await getUserInput("> ");
+        terminal.innerHTML += "\n";
+        showRunningAnimation();
+        await new Promise(r => setTimeout(r, 2000));
+
+        stopRunningAnimation();
+        terminal.innerHTML += "\n";
+
+        if (teamsData[teamName]) {
+            const team = teamsData[teamName];
+            await displayPoissonResults("goals scored", team.goals_scored);
+            await displayPoissonResults("goals conceded", team.goals_conceded);
+        } else {
+            await typeText("Team not found in database.\n");
+        }
+    }
+    else if (choice === "3") {
+    await typeText("\nAlright, so idea behind this project is the math. ETQ uses the Poisson distribution — a statistical model that predicts the probability of a certain number of goals being scored or conceded by a team. Each team has five data points for goals scored and conceded, and from that, the system calculates an average and uses it to generate probability outcomes from 0 to 5 goals. The higher the probability, the more likely that score will occur. This makes it a valuable predictive tool for sports analysis. It’s fast and mathematically driven.\n\n");
+
+    await typeText("\nThe crypto token is almost like shares in the project. Just like with a regular company, if you think its value will rise you buy shares — with ETQ, if you believe in the value of the project, you'll buy some of the associated token. This gives users a way to support the project and speculate on its worth. There is an associated ETQ sports betting bot that places bets based on the mathematically most likely results. The profits from these are then re-invested into the token, adding liquidity and helping keep the price stable.\n\n");
+
+    await typeText("\nETQ will primarily be focused on Premier League matches, but may expand to La Liga, Serie A, or even World Cup matches in the near future. So tag along for the ride\n\n");
+}
+else {
+
+        await typeText("Invalid option. Please try again.\n");
+    }
+
+    await nextCommandPrompt();  // ask for next input after finishing
+}
+
+/* ---------- LOOP CONTROL ---------- */
+async function nextCommandPrompt() {
+    await typeText("\nNext command (1, 2, 3):\n");
+    const next = await getUserInput("> ");
+    terminal.innerHTML += "\n";
+    await showMenuChoice(next);
+}
+
+async function showMenuChoice(choice) {
+    if (choice === "1" || choice === "2" || choice === "3") {
+        // re-run same logic as main menu without clearing screen
+        if (choice === "1") {
+            await typeText("Opening data page...\n\n");
+            const link = document.createElement("a");
+            link.href = "https://pump.fun/";
+            link.target = "_blank";
+            link.textContent = "Click here to view data";
+            terminal.appendChild(link);
+        }
+        else if (choice === "2") {
+            await typeText("Please enter a team name:\n\n");
+            const teamName = await getUserInput("> ");
+            terminal.innerHTML += "\n";
+            showRunningAnimation();
+            await new Promise(r => setTimeout(r, 2000));
+            stopRunningAnimation();
+            terminal.innerHTML += "\n";
+            if (teamsData[teamName]) {
+                const team = teamsData[teamName];
+                await displayPoissonResults("goals scored", team.goals_scored);
+                await displayPoissonResults("goals conceded", team.goals_conceded);
+            } else {
+                await typeText("Team not found in database.\n");
+            }
+        }
+       else if (choice === "3") {
+    await typeText("\nAlright, so the idea behind this project is the math. ETQ uses the Poisson distribution — a statistical model that predicts the probability of a certain number of goals being scored or conceded by a team. Each team has five data points for goals scored and conceded, and from that, the system calculates an average and uses it to generate probability outcomes from 0 to 5 goals. The higher the probability, the more likely that score will occur. This makes it a valuable predictive tool for sports analysis. It’s fast and mathematically driven.\n\n");
+
+    await typeText("\nThe crypto token is almost like shares in the project. Just like with a regular company, if you think its value will rise you buy shares — with ETQ, if you believe in the value of the project, you'll buy some of the associated token. This gives users a way to support the project and speculate on its worth. There is an associated ETQ sports betting bot that places bets based on the mathematically most likely results. The profits from these are then re-invested into the token, adding liquidity and helping keep the price stable.\n\n");
+
+    await typeText("\nETQ will primarily be focused on Premier League matches, but may expand to La Liga, Serie A, or even World Cup matches in the near future. So tag along for the ride\n\n");
+        }
+        await nextCommandPrompt();
+    } else {
+        await typeText("Invalid option. Try again.\n");
+        await nextCommandPrompt();
+    }
+}
+
+/* ---------- START ---------- */
+showMenu();
+</script>
+
+</body>
+</html>
