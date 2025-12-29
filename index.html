@@ -1,309 +1,269 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Command Prompt Interface</title>
-<style>
+  <title>EQX</title>
+
+  <style>
     body {
-        background-color: black;
-        color: white;
-        font-family: "Courier New", monospace;
-        margin: 0;
-        padding: 20px;
-        font-size: 18px;
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: radial-gradient(circle at top, #0a0f1f, #000);
+      color: #e6f1ff;
+      text-align: center;
     }
-    #terminal {
-        width: 100%;
-        max-width: 800px;
-        margin: auto;
-        white-space: pre-wrap;
-        overflow-y: auto;
+
+    .panel {
+      max-width: 420px;
+      margin: 30px auto;
+      padding: 20px;
+      background: rgba(20, 30, 60, 0.55);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      box-shadow: 0 0 30px rgba(0, 150, 255, 0.25);
     }
-    #user-input {
-        background: transparent;
-        border: none;
-        outline: none;
-        color: #00ff00;
-        font-family: inherit;
-        font-size: inherit;
-        width: 300px;
+
+    h2 {
+      margin-top: 0;
+      color: #6dd6ff;
+      text-shadow: 0 0 10px rgba(109, 214, 255, 0.6);
     }
-    .dots::after {
-        content: '';
-        animation: dots 1s steps(3, end) infinite;
+
+    video {
+      width: 100%;
+      border-radius: 12px;
+      margin-top: 10px;
+      box-shadow: 0 0 20px rgba(0, 150, 255, 0.3);
     }
-    @keyframes dots {
-        0% { content: ''; }
-        33% { content: '.'; }
-        66% { content: '..'; }
-        100% { content: '...'; }
+
+    button {
+      margin: 8px;
+      padding: 10px 20px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: white;
+      background: linear-gradient(135deg, #007bff, #00d4ff);
+      box-shadow: 0 0 15px rgba(0, 150, 255, 0.6);
     }
-    a {
-        color: #00ff00;
-        text-decoration: underline;
+
+    button:disabled {
+      opacity: 0.4;
+      box-shadow: none;
     }
-</style>
+
+    .metric {
+      margin-top: 18px;
+      font-size: 14px;
+      color: #a9c7ff;
+    }
+
+    .value {
+      font-size: 34px;
+      font-weight: bold;
+      color: #ffffff;
+      text-shadow: 0 0 12px rgba(255,255,255,0.7);
+    }
+
+    .note {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #ffd479;
+    }
+
+    .timer {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #6dd6ff;
+    }
+  </style>
 </head>
+
 <body>
 
-<div id="terminal"></div>
+  <div class="panel">
+    <h2>EQX</h2>
+ 
+ <div class="panel">
+    <h2>How To Use:</h2>
+    <h4>1: Place finger over device camera</h4>
+    <h4>2: Click start</h4>
+    <h4>3: Dont remove finger from camera while calculating baseline bpm (20s)</h4>
+ </div>   
+    
+
+    <button id="startBtn">Start</button>
+    <button id="stopBtn" disabled>Stop</button>
+
+    <video id="preview" autoplay muted playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <div class="metric">
+      Baseline BPM
+      <div id="baselineBPM" class="value">--</div>
+      <div id="baselineTimer" class="timer"></div>
+    </div>
+
+    <div class="metric">
+      Current BPM
+      <div id="currentBPM" class="value">--</div>
+      <div id="bpmNote" class="note">—</div>
+    </div>
+  </div>
 
 <script>
-const terminal = document.getElementById("terminal");
+  let mediaStream = null;
+  let redValues = [];
+  let timeList = [];
+  let heartRateInterval = null;
+  let trackWithTorch = null;
 
-/* ---------- DATA ---------- */
-const teamsData = {
-    "manchester united": {
-        goals_scored: [2, 1, 4, 4, 1],
-        goals_conceded: [1, 1, 1, 4, 2]
-    },
-    "newcastle united": {
-        goals_scored: [2, 2, 0, 2, 2],
-        goals_conceded: [2, 2, 1, 1, 2]
-    },
-    "nottingham forest": {
-        goals_scored: [1, 0, 2, 3, 0],
-        goals_conceded: [0, 3, 1, 0, 1]
-    },
-    "manchester city": {
-        goals_scored: [3, 2, 3, 2, 3],
-        goals_conceded: [0, 1, 0, 0, 0]
-    },
-	   "arsenal": {
-        goals_scored: [1, 3, 2, 1, 1],
-        goals_conceded: [2, 0, 1, 0, 1]
-    },
-     "brighton": {
-        goals_scored: [2, 3, 1, 0, 0],
-        goals_conceded: [0, 4, 1, 2, 0]
-    },
-    "brentford": {
-        goals_scored: [0, 0, 1, 0, 2],
-        goals_conceded: [2, 2, 1, 2, 0]
-    },
-    "bournemouth": {
-        goals_scored: [2, 0, 0, 4, 1],
-        goals_conceded: [3, 1, 0, 4, 1]
-	},
-	"burnley": {
-        goals_scored: [1, 0, 1, 2, 1],
-        goals_conceded: [3, 1, 2, 3, 1]
-    },
-    "everton": {
-        goals_scored: [1, 1, 3, 0, 0],
-        goals_conceded: [4, 0, 0, 2, 1]
-	},
-	"liverpool": {
-        goals_scored: [1, 3, 1, 2, 2],
-        goals_conceded: [1, 3, 0, 0, 1]
-    },
-    "wolves": {
-        goals_scored: [0, 0, 1, 1, 0],
-        goals_conceded: [1, 1, 4, 2, 2]
-	},
-	"westham": {
-        goals_scored: [0, 1, 1, 2, 0],
-        goals_conceded: [2, 1, 1, 3, 3]
-    },
-    "fulham": {
-        goals_scored: [4, 1, 3, 1, 1],
-        goals_conceded: [5, 2, 2, 2, 0]
-	},
-	"chelsea": {
-        goals_scored: [0, 1, 2, 3, 2],
-        goals_conceded: [0, 2, 0, 1, 2]
-    },
-    "aston villa": {
-        goals_scored: [4, 2, 2, 3, 2],
-        goals_conceded: [3, 1, 1, 2, 1]
-	}
-};
+  const video = document.getElementById('preview');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
 
-/* ---------- UTILITIES ---------- */
-function typeText(text, speed = 40) {
-    return new Promise(resolve => {
-        let i = 0;
-        const interval = setInterval(() => {
-            terminal.innerHTML += text[i];
-            i++;
-            if (i >= text.length) {
-                clearInterval(interval);
-                resolve();
-            }
-        }, speed);
+  const baselineBPMSpan = document.getElementById('baselineBPM');
+  const currentBPMSpan = document.getElementById('currentBPM');
+  const baselineTimer = document.getElementById('baselineTimer');
+  const bpmNote = document.getElementById('bpmNote');
+
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+
+  const CALIBRATION_DURATION = 20; // seconds
+  let calibrationStartTime = null;
+  let baselineBPM = null;
+
+  function movingAverage(data, windowSize = 5) {
+    const result = [];
+    for (let i = 0; i < data.length; i++) {
+      const start = Math.max(0, i - windowSize + 1);
+      const windowData = data.slice(start, i + 1);
+      result.push(windowData.reduce((a, b) => a + b, 0) / windowData.length);
+    }
+    return result;
+  }
+
+  function estimateBPM(data, time) {
+    const smooth = movingAverage(data, 5);
+    const mean = smooth.reduce((a, b) => a + b, 0) / smooth.length;
+    const centered = smooth.map(v => v - mean);
+
+    let peaks = [];
+    for (let i = 1; i < centered.length - 1; i++) {
+      if (centered[i] > centered[i - 1] &&
+          centered[i] > centered[i + 1] &&
+          centered[i] > 1) {
+        peaks.push(time[i]);
+      }
+    }
+
+    if (peaks.length < 2) return null;
+
+    let intervals = [];
+    for (let i = 1; i < peaks.length; i++) {
+      intervals.push(peaks[i] - peaks[i - 1]);
+    }
+
+    return Math.round(60 / (intervals.reduce((a,b)=>a+b,0) / intervals.length));
+  }
+
+  function bpmInterpretation(bpm) {
+    if (bpm < 60) return "Very Low Heart Rate";
+    if (bpm < 70) return "Resting / Low";
+    if (bpm < 80) return "Normal";
+    if (bpm < 90) return "Elevated";
+    if (bpm < 100) return "High Heart Rate";
+    return "Very High Heart Rate – High Risk";
+  }
+
+  function stopMonitoring() {
+    clearInterval(heartRateInterval);
+
+    if (trackWithTorch) {
+      trackWithTorch.applyConstraints({ advanced: [{ torch: false }] }).catch(()=>{});
+      trackWithTorch = null;
+    }
+
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => t.stop());
+      mediaStream = null;
+    }
+
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  }
+
+  startBtn.onclick = async () => {
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+
+    redValues = [];
+    timeList = [];
+    baselineBPM = null;
+    calibrationStartTime = Date.now();
+
+    baselineBPMSpan.innerText = "--";
+    currentBPMSpan.innerText = "--";
+    bpmNote.innerText = "—";
+
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false
     });
-}
 
-function getUserInput(promptText = "> ") {
-    return new Promise(resolve => {
-        const inputLine = document.createElement("div");
-        inputLine.innerHTML = promptText;
-        const input = document.createElement("input");
-        input.type = "text";
-        input.id = "user-input";
-        input.autofocus = true;
-        inputLine.appendChild(input);
-        terminal.appendChild(inputLine);
-        input.focus();
-
-        input.addEventListener("keydown", e => {
-            if (e.key === "Enter") {
-                const val = input.value.trim().toLowerCase();
-                input.disabled = true;
-                inputLine.innerHTML = `${promptText}${val}`;
-                resolve(val);
-            }
-        });
-    });
-}
-
-function showRunningAnimation() {
-    const run = document.createElement("div");
-    run.id = "running-line";
-    run.classList.add("dots");
-    run.textContent = "Running";
-    terminal.appendChild(run);
-}
-
-function stopRunningAnimation() {
-    const run = document.getElementById("running-line");
-    if (run) run.remove();
-}
-
-/* ---------- MATH ---------- */
-function factorial(n) {
-    return n <= 1 ? 1 : n * factorial(n - 1);
-}
-function poisson(k, lambda) {
-    return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
-}
-
-/* ---------- OUTPUT ---------- */
-async function displayPoissonResults(label, dataArray) {
-    const avg = dataArray.reduce((a,b)=>a+b,0)/dataArray.length;
-    await typeText(`\nAverage ${label}: ${avg.toFixed(2)}\n`);
-    await typeText(`Poisson distribution for ${label} (0–5 goals):\n`);
-
-    const results = [];
-    for (let k=0;k<=5;k++){
-        const p = poisson(k, avg);
-        results.push({k,p});
+    const track = mediaStream.getVideoTracks()[0];
+    if (track.getCapabilities().torch) {
+      await track.applyConstraints({ advanced: [{ torch: true }] });
+      trackWithTorch = track;
     }
-    const maxP = Math.max(...results.map(r=>r.p));
 
-    for (const r of results){
-        const percent = (r.p*100).toFixed(2);
-        const arrow = r.p === maxP ? "  <-- most likely" : "";
-        await typeText(` P(${r.k}) = ${r.p.toFixed(4)} (${percent}%)${arrow}\n`);
-    }
-    await typeText("\n");
-}
+    video.srcObject = mediaStream;
+    canvas.width = 320;
+    canvas.height = 240;
 
-/* ---------- MENU LOGIC ---------- */
-async function showMenu() {
-    await typeText("\nETQ TOKEN\n\n");
-	await typeText("\PLEASE NOTE: with this being a demo launch ony premier league teams playing on the 26th and 27th of December 2025 will be available\n\n");
-    await typeText("\nHello, please select an option (1,2 or 3):\n\n");
-    await typeText("1. View Data\n");
-    await typeText("2. Team\n");
-    await typeText("3. About Us\n\n");
+    let t = 0;
+    heartRateInterval = setInterval(() => {
+      if (video.readyState >= 2) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
 
-    const choice = await getUserInput("> ");
-    terminal.innerHTML += "\n";
+        let redSum = 0;
+        for (let i = 0; i < data.length; i += 4) redSum += data[i];
 
-    if (choice === "1") {
-        await typeText("Opening data page...\n\n");
-        const link = document.createElement("a");
-        link.href = "https://pump.fun/";
-        link.target = "_blank";
-        link.textContent = "Click here to view data";
-        terminal.appendChild(link);
-    }
-    else if (choice === "2") {
-        await typeText("Please enter a team name (please type the full name):\n\n");
-        const teamName = await getUserInput("> ");
-        terminal.innerHTML += "\n";
-        showRunningAnimation();
-        await new Promise(r => setTimeout(r, 2000));
+        redValues.push(redSum / (data.length / 4));
+        timeList.push(t);
+        t += 1 / 30;
 
-        stopRunningAnimation();
-        terminal.innerHTML += "\n";
-
-        if (teamsData[teamName]) {
-            const team = teamsData[teamName];
-            await displayPoissonResults("goals scored", team.goals_scored);
-            await displayPoissonResults("goals conceded", team.goals_conceded);
-        } else {
-            await typeText("Team not found in database.\n");
+        if (redValues.length > 300) {
+          redValues.shift();
+          timeList.shift();
         }
-    }
-    else if (choice === "3") {
-    await typeText("\nAlright, so idea behind this project is the math. ETQ uses the Poisson distribution — a statistical model that predicts the probability of a certain number of goals being scored or conceded by a team. Each team has five data points for goals scored and conceded, and from that, the system calculates an average and uses it to generate probability outcomes from 0 to 5 goals. The higher the probability, the more likely that score will occur. This makes it a valuable predictive tool for sports analysis. It’s fast and mathematically driven.\n\n");
 
-    await typeText("\nThe crypto token is almost like shares in the project. Just like with a regular company, if you think its value will rise you buy shares — with ETQ, if you believe in the value of the project, you'll buy some of the associated token. This gives users a way to support the project and speculate on its worth. There is an associated ETQ sports betting bot that places bets based on the mathematically most likely results. The profits from these are then re-invested into the token, adding liquidity and helping keep the price stable.\n\n");
+        if (redValues.length >= 150) {
+          const bpm = estimateBPM(redValues, timeList);
+          if (bpm !== null) {
+            currentBPMSpan.innerText = bpm;
+            bpmNote.innerText = bpmInterpretation(bpm);
+          }
 
-    await typeText("\nETQ will primarily be focused on Premier League matches, but may expand to La Liga, Serie A, or even World Cup matches in the near future. So tag along for the ride\n\n");
-}
-else {
+          const elapsed = (Date.now() - calibrationStartTime) / 1000;
+          const remaining = Math.max(0, Math.ceil(CALIBRATION_DURATION - elapsed));
 
-        await typeText("Invalid option. Please try again.\n");
-    }
-
-    await nextCommandPrompt();  // ask for next input after finishing
-}
-
-/* ---------- LOOP CONTROL ---------- */
-async function nextCommandPrompt() {
-    await typeText("\nNext command (1, 2, 3):\n");
-    const next = await getUserInput("> ");
-    terminal.innerHTML += "\n";
-    await showMenuChoice(next);
-}
-
-async function showMenuChoice(choice) {
-    if (choice === "1" || choice === "2" || choice === "3") {
-        // re-run same logic as main menu without clearing screen
-        if (choice === "1") {
-            await typeText("Opening data page...\n\n");
-            const link = document.createElement("a");
-            link.href = "https://pump.fun/";
-            link.target = "_blank";
-            link.textContent = "Click here to view data";
-            terminal.appendChild(link);
+          if (elapsed < CALIBRATION_DURATION) {
+            baselineTimer.innerText = `Calibrating… ${remaining}s`;
+            if (bpm !== null) baselineBPM = baselineBPM === null ? bpm : (baselineBPM + bpm) / 2;
+          } else {
+            baselineTimer.innerText = "";
+            baselineBPMSpan.innerText = baselineBPM !== null ? baselineBPM.toFixed(0) : "--";
+          }
         }
-        else if (choice === "2") {
-            await typeText("Please enter a team name:\n\n");
-            const teamName = await getUserInput("> ");
-            terminal.innerHTML += "\n";
-            showRunningAnimation();
-            await new Promise(r => setTimeout(r, 2000));
-            stopRunningAnimation();
-            terminal.innerHTML += "\n";
-            if (teamsData[teamName]) {
-                const team = teamsData[teamName];
-                await displayPoissonResults("goals scored", team.goals_scored);
-                await displayPoissonResults("goals conceded", team.goals_conceded);
-            } else {
-                await typeText("Team not found in database.\n");
-            }
-        }
-       else if (choice === "3") {
-    await typeText("\nAlright, so the idea behind this project is the math. ETQ uses the Poisson distribution — a statistical model that predicts the probability of a certain number of goals being scored or conceded by a team. Each team has five data points for goals scored and conceded, and from that, the system calculates an average and uses it to generate probability outcomes from 0 to 5 goals. The higher the probability, the more likely that score will occur. This makes it a valuable predictive tool for sports analysis. It’s fast and mathematically driven.\n\n");
+      }
+    }, 1000 / 30);
+  };
 
-    await typeText("\nThe crypto token is almost like shares in the project. Just like with a regular company, if you think its value will rise you buy shares — with ETQ, if you believe in the value of the project, you'll buy some of the associated token. This gives users a way to support the project and speculate on its worth. There is an associated ETQ sports betting bot that places bets based on the mathematically most likely results. The profits from these are then re-invested into the token, adding liquidity and helping keep the price stable.\n\n");
-
-    await typeText("\nETQ will primarily be focused on Premier League matches, but may expand to La Liga, Serie A, or even World Cup matches in the near future. So tag along for the ride\n\n");
-        }
-        await nextCommandPrompt();
-    } else {
-        await typeText("Invalid option. Try again.\n");
-        await nextCommandPrompt();
-    }
-}
-
-/* ---------- START ---------- */
-showMenu();
+  stopBtn.onclick = stopMonitoring;
 </script>
 
 </body>
